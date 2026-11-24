@@ -47,7 +47,7 @@ const app=$('#app');
 const slug=new URLSearchParams(location.search).get('park')||'border-park';
 let prefs={sport:'pickleball'};try{Object.assign(prefs,JSON.parse(localStorage.getItem('cn-prefs')||'{}'))}catch(e){}
 const savePrefs=()=>{try{const c=JSON.parse(localStorage.getItem('cn-prefs')||'{}')||{};localStorage.setItem('cn-prefs',JSON.stringify({...c,sport:prefs.sport}))}catch(e){}};
-const S={arrive:'',toastText:'Update shared',live:null,step:'loading',park:null,parks:[],picking:false,user:null,email:'',first:'',last:'',err:'',busy:false,lv:null,errCome:'',toast:false,recent:[]};
+const S={arrive:'',toastText:'Update shared',live:null,step:'loading',park:null,parks:[],picking:false,user:null,email:'',first:'',last:'',err:'',busy:false,lv:null,ask:false,pending:null,draft:{n:'',e:''},askErr:'',errCome:'',toast:false,recent:[]};
 let sb=null;
 const head=()=>`<div class="topbar"><a class="head" href="./" aria-label="Play Pulse home" style="text-decoration:none;color:inherit"><img src="icon.png?v=4" alt="" width="40" height="40"><b class="sg" style="font-size:20px">Play Pulse</b></a><a class="homebtn" href="./"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Home</a></div>`;
 const courts=()=>S.park?(prefs.sport==='tennis'?S.park.tennis_courts:S.park.pickleball_courts):0;
@@ -67,6 +67,17 @@ function suggestion(){const d=new Date(),h=d.getHours()+d.getMinutes()/60;
 const t12=v=>{const [h,m]=v.split(':').map(Number),d=new Date();d.setHours(h,m,0,0);return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
 const fmtT=t=>new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 S.joinNote='';{const j=new URLSearchParams(location.search).get('join');const d=j?new Date(j):null;if(d&&!isNaN(d)&&d.getTime()>Date.now()-10*60000){S.arrive=hhmm(d);S.joinNote='Joining at '+fmtT(d)+'. Tap I\'m coming to confirm.'}}
+const gName=()=>{try{return localStorage.getItem('cn-guest')||''}catch(e){return ''}};
+const gEmail=()=>{try{return localStorage.getItem('cn-guest-email')||''}catch(e){return ''}};
+const who=()=>S.user?fullName(S.user):gName();
+const hasId=()=>!!S.user||!!(gName()&&gEmail());
+async function ensureSession(){ // signed-in member, or a guest session (anonymous sign-in + private contact row)
+  if(S.user)return null;
+  let {data:{session}}=await sb.auth.getSession();
+  if(!session){const r=await sb.auth.signInAnonymously({options:{data:{nickname:gName()}}});if(r.error)return 'Guest check-in is not available right now ('+(r.error.message||'unknown error')+'). Please sign in with email.'}
+  const cr=await sb.from('guest_contacts').insert({nickname:gName(),email:gEmail()});
+  if(cr.error&&cr.error.code!=='23505')return 'Could not save your details: '+cr.error.message;
+  return null}
 const fullName=u=>{const m=u?.user_metadata||{};return [m.first_name,m.last_name].filter(Boolean).join(' ')||(u?.email||'').split('@')[0]};
 
 async function init(){
@@ -77,8 +88,8 @@ async function init(){
   S.park=pk;fixSport();
   const {data:all}=await sb.from('parks').select('*').order('name');S.parks=all||[pk];
   const {data:{session}}=await sb.auth.getSession();S.user=session?.user&&!session.user.is_anonymous?session.user:null;
-  sb.auth.onAuthStateChange((_e,s)=>{const had=!!S.user;S.user=s?.user&&!s.user.is_anonymous?s.user:null;if(S.user&&!had){S.step='checkin';render()}});
-  S.step=S.user?'checkin':'signin';render();
+  sb.auth.onAuthStateChange((_e,s)=>{const had=!!S.user;S.user=s?.user&&!s.user.is_anonymous?s.user:null;if(S.user&&!had){S.step='checkin';render();loadRecent()}});
+  S.step='checkin';render();
 }
 function fixSport(){const p=S.park;if(!(p.tennis_courts>0)&&prefs.sport==='tennis')prefs.sport='pickleball';if(!(p.pickleball_courts>0)&&prefs.sport==='pickleball')prefs.sport='tennis'}
 async function loadLive(){if(!sb||!S.park)return;const {data}=await sb.rpc('park_counts',{p_sport:prefs.sport});S.live=(data||[]).find(r=>r.slug===S.park.slug)||null;if(S.step!=='loading')render()}
@@ -88,14 +99,14 @@ function render(){
  let h=head();
  if(S.step==='loading')h+='<div class="muted">Loading…</div>';
  else if(S.step==='nopark')h+='<div class="card"><b>Park not found</b><div class="muted">Check the QR code on the sign, or the link you were given.</div></div>';
- else if(S.step==='signin')h+=`${liveCard()}<h1>Sign in to share an update</h1><div class="muted">${esc(S.park.name)}. No app needed.</div>
+ else if(S.step==='signin')h+=`${liveCard()}<h1>Sign in</h1><div class="muted">Optional. ${esc(S.park.name)}. Signing in shows your full name and works on any device.</div>
     <div class="row"><div class="fld"><label for="fn">First name</label><input id="fn" autocomplete="given-name" value="${esc(S.first)}"></div><div class="fld"><label for="ln">Last name</label><input id="ln" autocomplete="family-name" value="${esc(S.last)}"></div></div>
   <div><label for="em">Email</label><input id="em" type="email" autocomplete="email" value="${esc(S.email)}"></div>
   <div class="err" role="alert">${esc(S.err)}</div>
-  <button class="btn" id="send" ${S.busy?'disabled':''}>Continue with email</button><div class="muted">We only collect first name, last name and email.</div>`;
+  <button class="btn" id="send" ${S.busy?'disabled':''}>Continue with email</button><button class="lnk" id="skip">Not now, continue as a guest</button><div class="muted">We only collect first name, last name and email.</div>`;
  else if(S.step==='code')h+=`<h1>Check your email</h1><div class="muted">We sent a code to ${esc(S.email)}. Enter it to confirm the address is yours.</div><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Code" aria-label="Verification code"><div class="err" role="alert">${esc(S.err)}</div><button class="btn" id="verify" ${S.busy?'disabled':''}>Verify</button><button class="lnk" id="back">Change email</button>`;
  else if(S.step==='checkin'){
-  h+=`<div class="muted">Signed in as ${esc(fullName(S.user))} · <button class="lnk" id="out">Sign out</button></div>
+  h+=(S.user?`<div class="muted">Signed in as ${esc(fullName(S.user))} · <button class="lnk" id="out">Sign out</button></div>`:`<div class="muted">${gName()?`Checking in as <b>${esc(gName())}</b> (guest) · <button class="lnk" id="gchange">Change</button> · `:'No account needed · '}<button class="lnk" id="tosignin">Sign in</button></div>`)+(S.ask?`<div class="card" style="gap:8px"><b>${S.pending&&S.pending.t==='come'?'Share your arrival':'Share how busy it is'}</b><div class="muted">A nickname and email. No password needed. Your email is never shown to others.</div><input id="gname" type="text" autocomplete="nickname" maxlength="20" placeholder="Nickname" aria-label="Nickname" value="${esc(S.draft.n||gName())}" style="min-height:44px"><input id="gemail" type="email" autocomplete="email" maxlength="254" placeholder="Email" aria-label="Email" value="${esc(S.draft.e||gEmail())}" style="min-height:44px"><div class="err" role="alert">${esc(S.askErr)}</div><div style="display:flex;gap:8px"><button type="button" class="btn" id="gok" ${S.busy?'disabled':''}>Continue</button><button type="button" class="btn alt" id="gno" style="width:auto;padding:0 16px">Cancel</button></div></div>`:'')+`
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div class="muted">Reporting for</div><b class="sg" style="font-size:17px">${esc(S.park.name)}</b><div class="muted">${courts()} ${prefs.sport} courts</div></div><button class="btn alt" id="chg" style="width:auto;padding:0 14px;min-height:44px;border-radius:22px">${S.picking?'Close':'Change park'}</button></div>${S.picking?`<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">${S.parks.map(p=>`<button class="btn alt" data-park="${esc(p.slug)}" style="text-align:left;padding:0 14px;${p.slug===S.park.slug?'border-color:var(--green);font-weight:700':''}">${esc(p.name)}</button>`).join('')}</div>`:''}</div>${sportSeg()}
   <div class="card cnt"><b class="sg" style="font-size:16px">Coming later?</b><div class="muted" style="font-size:12px">Let others know when you plan to arrive. This is separate from the busy level.</div>${S.joinNote?`<div style="color:#2C5A12;font-weight:600;font-size:13px">${esc(S.joinNote)}</div>`:''}<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><input id="arr" type="time" aria-label="Estimated arrival time" value="${esc(S.arrive||suggestion()||'')}" style="flex:1;min-height:44px"><button class="btn alt" id="come" type="button" ${S.busy?'disabled':''} style="width:auto;padding:0 14px;min-height:44px;border-radius:22px">I'm coming</button></div>${S.errCome?`<div class="err" role="alert">${esc(S.errCome)}</div>`:''}</div>
   <div class="card cnt"><b class="sg" style="font-size:16px">How busy is it right now?</b><div class="lvs">${LV.map((l,k)=>`<button type="button" class="lvb" data-lv="${k}" ${S.busy?'disabled':''} aria-pressed="${S.lv===k}" style="${S.lv===k?'color:'+l.c:''}"><b style="color:${l.c}">${l.n}</b><span>${lvHint(k,courts())}</span></button>`).join('')}</div></div>
@@ -104,13 +115,21 @@ function render(){
  if(S.toast)h+='<div class="pill" id="pill">'+esc(S.toastText)+'</div>';
  app.innerHTML=h;wire();
 }
+async function act(p){ // p = {t:'lv',lv} or {t:'come',at}; asks for guest details first when needed
+  if(!p)return;
+  if(!hasId()){S.pending=p;S.ask=true;S.askErr='';return render()}
+  S.busy=true;S.err='';S.errCome='';if(p.t==='lv')S.lv=p.lv;render();
+  const bad=await ensureSession();if(bad){S.busy=false;S.lv=null;if(p.t==='lv')S.err=bad;else S.errCome=bad;return render()}
+  let error,msg;
+  if(p.t==='lv'){({error}=await sb.from('reports').insert({park_slug:S.park.slug,sport:prefs.sport,reporter_name:who(),level:p.lv}));msg='Thanks! Update shared'}
+  else{({error}=await sb.from('arrivals').insert({park_slug:S.park.slug,sport:prefs.sport,reporter_name:who(),arriving_at:p.at}));msg='Arrival shared'}
+  S.busy=false;if(error){S.lv=null;if(p.t==='lv')S.err=error.message;else S.errCome=error.message;return render()}
+  if(p.t==='come'){S.arrive='';S.joinNote=''}
+  S.toastText=msg;S.toast=true;render();await loadRecent();loadLive();const pl=$('#pill');setTimeout(()=>{pl&&(pl.style.opacity=0)},1800);setTimeout(()=>{S.toast=false;S.lv=null;render()},2400)}
 function wire(){
  const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f};
  app.querySelectorAll('[data-sport]').forEach(b=>b.onclick=()=>{prefs.sport=b.dataset.sport;savePrefs();S.recent=[];S.live=null;render();loadRecent();loadLive()});
- app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=async()=>{if(S.busy)return;S.lv=Number(b.dataset.lv);S.busy=true;S.err='';render();
-  const {error}=await sb.from('reports').insert({park_slug:S.park.slug,sport:prefs.sport,reporter_name:fullName(S.user),level:S.lv});
-  S.busy=false;if(error){S.lv=null;S.err=error.message;return render()}
-  S.toastText='Thanks! Update shared';S.toast=true;render();await loadRecent();const p=$('#pill');setTimeout(()=>{p&&(p.style.opacity=0)},1800);setTimeout(()=>{S.toast=false;S.lv=null;render()},2400)});
+ app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{if(S.busy)return;act({t:'lv',lv:Number(b.dataset.lv)})});
  on('send',async()=>{S.first=$('#fn').value.trim();S.last=$('#ln').value.trim();S.email=$('#em').value.trim();
   if(!S.first||!S.last||!/^\S+@\S+\.\S+$/.test(S.email)){S.err='Enter your first name, last name and a valid email.';return render()}
   S.busy=true;S.err='';render();
@@ -122,21 +141,28 @@ function wire(){
   if(error){const r2=await sb.auth.verifyOtp({email:S.email,token:t,type:'signup'});if(!r2.error){data=r2.data;error=null}}
   S.busy=false;if(error){S.err='That code did not work. Check it and try again.';render()}else{S.user=data.user;S.step='checkin';render();loadRecent()}});
  {const a=$('#arr');if(a)a.oninput=a.onchange=()=>{S.arrive=a.value||''}}
- on('come',async()=>{const a=$('#arr');const v=(a&&a.value)||S.arrive||'';S.errCome='';
+ on('come',()=>{const a=$('#arr');const v=(a&&a.value)||S.arrive||'';S.errCome='';
   if(!v){S.errCome='Pick an arrival time.';return render()}
   S.arrive=v;const [hh,mm]=v.split(':').map(Number);const d=new Date();d.setHours(hh,mm,0,0);
   if(d.getTime()<Date.now()-10*60000){S.errCome='That time has already passed. Pick a later time.';return render()}
-  S.busy=true;render();
-  const {error}=await sb.from('arrivals').insert({park_slug:S.park.slug,sport:prefs.sport,reporter_name:fullName(S.user),arriving_at:d.toISOString()});
-  S.busy=false;if(error){S.errCome=error.message;return render()}
-  S.arrive='';S.joinNote='';S.toastText='Arrival shared';S.toast=true;render();const p=$('#pill');setTimeout(()=>{p&&(p.style.opacity=0)},1800);setTimeout(()=>{S.toast=false;render()},2400)});
+  if(!S.busy)act({t:'come',at:d.toISOString()})});
+ on('tosignin',()=>{S.step='signin';S.err='';render()});
+ on('skip',()=>{S.step='checkin';S.err='';render()});
+ on('gchange',()=>{try{localStorage.removeItem('cn-guest');localStorage.removeItem('cn-guest-email')}catch(e){}S.draft={n:'',e:''};render()});
+ on('gno',()=>{S.ask=false;S.pending=null;S.askErr='';render()});
+ on('gok',()=>{const n=$('#gname').value.replace(/[^\p{L}\p{N}' ._-]/gu,'').trim().slice(0,20),em=$('#gemail').value.trim();S.draft={n,e:em};
+  if(n.length<2){S.askErr='Please enter a nickname (at least 2 characters).';return render()}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){S.askErr='Please enter a valid email.';return render()}
+  try{localStorage.setItem('cn-guest',n);localStorage.setItem('cn-guest-email',em)}catch(e){}
+  S.ask=false;S.askErr='';const p=S.pending;S.pending=null;act(p)});
  on('chg',()=>{S.picking=!S.picking;render()});
  app.querySelectorAll('[data-park]').forEach(b=>b.onclick=()=>{const p=S.parks.find(x=>x.slug===b.dataset.park);if(!p)return;S.park=p;S.picking=false;fixSport();S.recent=[];S.live=null;loadLive();S.lv=null;try{history.replaceState(null,'','?park='+encodeURIComponent(p.slug))}catch(e){}render();loadRecent()});
  on('back',()=>{S.step='signin';S.err='';render()});
+
  on('out',async()=>{await sb.auth.signOut();S.user=null;S.step='signin';render()});
 }
-async function loadRecent(){if(!S.user||!S.park)return;
- const {data}=await sb.from('reports').select('reporter_name,level,playing,waiting,created_at').eq('park_slug',S.park.slug).eq('sport',prefs.sport).order('created_at',{ascending:false}).limit(30);
- S.recent=data||[];if(S.step==='checkin'&&!S.toast)render()}
+async function loadRecent(){if(!S.park)return;
+ const {data}=await sb.rpc('park_reports',{p_slug:S.park.slug,p_sport:prefs.sport});
+ S.recent=(data||[]).map(r=>({reporter_name:r.who,level:r.level,playing:r.playing,waiting:r.waiting,created_at:r.created_at}));if(S.step==='checkin'&&!S.toast)render()}
 init().then(()=>{loadRecent();loadLive();setInterval(loadLive,30000)});
 </script></body></html>
