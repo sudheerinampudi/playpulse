@@ -37,7 +37,7 @@ a.lnk,button.lnk{color:var(--green);font:600 13px Inter;background:none;border:n
 .coming{display:inline-block;align-self:flex-start;background:#EAF6C8;color:#2C5A12;border-radius:12px;padding:3px 10px;font:600 13px Inter}
 .chips{display:flex;gap:6px}.chips button{flex:1;min-height:40px;border:1px solid var(--outline);background:#fff;border-radius:20px;font:600 13px Inter;color:var(--ink);cursor:pointer}.chips button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
 .mtr{display:flex;gap:4px;margin-top:2px}.mtr i{flex:1;height:8px;border-radius:4px;background:#E3E8E2}.lvl{font:700 34px/1.1 "Space Grotesk";letter-spacing:-.02em}
-.avs{display:flex;flex-wrap:wrap;gap:6px}.av{width:34px;height:34px;border-radius:50%;background:#2C5A12;color:#fff;font:700 12px 'Space Grotesk',sans-serif;display:inline-flex;align-items:center;justify-content:center;letter-spacing:.02em}.av.guest{background:#DCE9FB;color:#1F4E96;border:1.5px dashed #5B8FD8}.av.empty{background:transparent;border:1.5px dashed var(--ring)}/*tbar*/.tbar{display:flex;gap:6px}.tbar button.seg{border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important}.tbar .seg{flex:1;background:none;border:0;padding:6px 0 0;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:stretch;font:inherit;min-height:44px}.tbar .seg i{height:16px;border-radius:8px;background:#E3E8E2;display:block}.tbar .seg:active i{outline:2px solid var(--ink)}.tbar .seg span{font-size:11.5px;color:var(--muted);text-align:center}
+.avs{display:flex;flex-wrap:wrap;gap:6px}.av{width:34px;height:34px;border-radius:50%;background:#2C5A12;color:#fff;font:700 12px 'Space Grotesk',sans-serif;display:inline-flex;align-items:center;justify-content:center;letter-spacing:.02em}.av.guest{background:#DCE9FB;color:#1F4E96;border:1.5px dashed #5B8FD8}.av.me{box-shadow:0 0 0 2px #fff,0 0 0 4px #2C5A12}.av.empty{background:transparent;border:1.5px dashed var(--ring)}/*tbar*/.tbar{display:flex;gap:6px}.tbar button.seg{border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important}.tbar .seg{flex:1;background:none;border:0;padding:6px 0 0;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:stretch;font:inherit;min-height:44px}.tbar .seg i{height:16px;border-radius:8px;background:#E3E8E2;display:block}.tbar .seg:active i{outline:2px solid var(--ink)}.tbar .seg span{font-size:11.5px;color:var(--muted);text-align:center}
 button.av.add{cursor:pointer;color:#2C5A12;font-size:20px;border:1.5px dashed #6E9B3A;background:#F6FAF4;padding:0}.lvs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lvb{min-height:64px;border:2px solid var(--ring);background:#fff;border-radius:14px;padding:8px 10px;text-align:left;font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px}.lvb b{font:700 16px 'Space Grotesk'}.lvb span{font-size:11.5px;color:var(--muted)}.av.more{background:#E3E8E2;color:var(--ink)}
 </style></head><body><main id="app"></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -55,10 +55,10 @@ const savePrefs=()=>{try{const c=JSON.parse(localStorage.getItem('cn-prefs')||'{
 const miles=(a,b,c,d)=>{const R=3958.8,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
 let msg='';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const grp=()=>{const m=new Map();arrs.forEach(a=>{const d=new Date(a.arriving_at),k=Math.floor(d.getTime()/60000);if(!m.has(k))m.set(k,{at:a.arriving_at,who:[]});m.get(k).who.push(a.who)});
-  const out=[];m.forEach(g=>{if(prefs.sport!=='tennis'){out.push(g);return}
-    for(let i=0;i<g.who.length;i+=4)out.push({at:g.at,who:g.who.slice(i,i+4),dbl:true});});return out};
-let newOpen=false,newTime='',joinDraft={n:'',e:''},joinAsk=null,joinMsg='',user=null,profOpen=false,pMsg='',pBusy=false;
+const grp=()=>{const m=new Map();arrs.forEach(a=>{const d=new Date(a.arriving_at),k=Math.floor(d.getTime()/60000);if(!m.has(k))m.set(k,{at:a.arriving_at,who:[],m:[]});const g=m.get(k);g.who.push(a.who);g.m.push(!!a.mine)});
+  const out=[];m.forEach(g=>{if(prefs.sport!=='tennis'){g.mine=g.m.some(Boolean);out.push(g);return}
+    for(let i=0;i<g.who.length;i+=4){const w=g.who.slice(i,i+4),mm=g.m.slice(i,i+4);out.push({at:g.at,who:w,m:mm,mine:mm.some(Boolean),dbl:true})}});return out};
+let joinUndo=false,newOpen=false,newTime='',joinDraft={n:'',e:''},joinAsk=null,joinMsg='',user=null,profOpen=false,pMsg='',pBusy=false;
 const nm=u=>{const m=(u&&u.user_metadata)||{};return {f:m.first_name||'',l:m.last_name||'',av:m.avatar_url||''}};
 const initials=u=>{const n=nm(u);const t=((n.f[0]||'')+(n.l[0]||'')).toUpperCase();return t||((u&&u.email||'?')[0]||'?').toUpperCase()};
 const real=u=>u&&!u.is_anonymous?u:null;
@@ -140,7 +140,7 @@ const tbar=L=>`<div class="tbar" role="group" aria-label="Tap a segment to repor
 const lvD=a=>{const v=lvOf(a);return v==null?0:v}; // no recent reports = Free by default
 const memInit=w=>{const g=/ \(guest\)$/.test(w),n=w.replace(/ \(guest\)$/,'').replace(/\./g,'').trim(),p=n.split(/\s+/).filter(Boolean);
   return ((p.length>1?p[0][0]+p[p.length-1][0]:n.slice(0,2))||'?').toUpperCase()};
-const avatar=w=>`<span class="av${/ \(guest\)$/.test(w)?' guest':''}" title="${esc(w)}">${esc(memInit(w))}</span>`;
+const avatar=(w,me)=>`<span class="av${/ \(guest\)$/.test(w)?' guest':''}${me?' me':''}" title="${esc(w)}${me?' (you)':''}">${esc(memInit(w))}</span>`;
 const comingTxt=n=>{n=Number(n)||0;return n>0?(n===1?'1 person':n+' people')+' coming later today':''};
 const ago=t=>{const m=Math.max(0,Math.round((Date.now()-new Date(t))/60000));return m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' hr ago'};
 function renderPark(){
@@ -153,13 +153,13 @@ function renderPark(){
   else{
     h+=`<div class="card feat"><div class="muted"><span class="live">Live</span> · ${feat.courts} ${prefs.sport} courts</div><b class="sg" style="font-size:22px">${esc(feat.name)}</b><div class="row2" style="align-items:flex-start"><div style="flex:1;min-width:150px">${(()=>{const L=lvD(feat.avg_level);return `<div class="lvl" style="color:${LV[L].c}">${LV[L].n}</div><div class="muted" style="margin-top:4px">${lvHint(L,feat.courts)}</div>`})()}</div><div><div class="big" style="color:#2C5A12">${Number(feat.arriving_today)||0}</div><div class="muted">coming soon</div></div></div><div class="muted">${Number(feat.report_count)?'Average of '+Number(feat.report_count)+' report'+(feat.report_count==1?'':'s')+' in the last 2 hours':'No reports in the last 2 hours. Be the first!'}</div><b class="sg" style="font-size:15px;margin-top:6px">Tap the bar to report how busy it is right now</b>${tbar(lvD(feat.avg_level))}</div>`;
     if(joinAsk!==null){const g=joinAsk;h+=`<div class="card" style="gap:8px"><b>${g.t==='join'?'Join at '+new Date(g.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'Report: '+LV[g.lv].n}</b><div class="muted">A nickname and email. No password needed. Your email is never shown to others.</div><input id="gname" type="text" autocomplete="nickname" maxlength="20" placeholder="Nickname" aria-label="Nickname" value="${esc(joinDraft.n||gName())}" style="min-height:44px"><input id="gemail" type="email" autocomplete="email" maxlength="254" placeholder="Email" aria-label="Email" value="${esc(joinDraft.e||gEmail())}" style="min-height:44px"><div style="display:flex;gap:8px"><button type="button" class="btn" id="gjoin">Continue</button><button type="button" class="btn alt" id="gcancel" style="width:auto;padding:0 16px">Cancel</button></div><a class="lnk" href="checkin.html?park=${encodeURIComponent(slug)}${g.t==='join'?'&join='+encodeURIComponent(g.at):''}">Or sign in with email</a></div>`}
-    if(joinMsg)h+=`<div class="card" role="status" style="background:#EAF6C8;border-color:#C9E58A"><b>${esc(joinMsg)}</b></div>`;
+    if(joinMsg)h+=`<div class="card" role="status" style="background:#EAF6C8;border-color:#C9E58A"><b>${esc(joinMsg)}</b>${joinUndo?' <button type="button" class="lnk" id="undo">Undo</button>':''}</div>`;
     h+=`<b class="sg">Coming soon</b>`+grp().map((g,i)=>{const t=new Date(g.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),full=g.dbl&&g.who.length===4;
       const shown=g.dbl?g.who:g.who.slice(0,5),extra=g.dbl?0:g.who.length-shown.length;
       const add=`<button type="button" class="av empty add" data-join="${i}" aria-label="Join at ${t}" title="Join at ${t}">+</button>`;
-      const chips=shown.map(w=>avatar(w)).join('')+(extra>0?`<span class="av more">+${extra}</span>`:'')+(g.dbl?(full?'':Array.from({length:4-g.who.length},()=>add).join('')):add);
+      const chips=shown.map((w,ix)=>avatar(w,g.m[ix])).join('')+(extra>0?`<span class="av more">+${extra}</span>`:'')+(g.dbl?(full?'':Array.from({length:4-g.who.length},()=>add).join('')):add);
       const sub=g.dbl?`Doubles ${g.who.length}/4 · ${full?'Full · ':''}arriving ${t}`:`${g.who.length>1?g.who.length+' people · ':''}arriving ${t}`;
-      return `<div class="card" style="flex-direction:row;justify-content:space-between;align-items:center;gap:10px"><div><div class="avs" role="img" aria-label="${esc(g.who.join(', ')||'Open doubles group')}">${chips}</div><div class="muted" style="margin-top:4px">${sub}</div></div>${full?'<span class="muted" style="font-weight:600">Full</span>':''}</div>`}).join('')+`<div class="card" style="gap:8px"><div style="display:flex;align-items:center;gap:10px"><button type="button" class="av empty add" id="newt" aria-label="Add a new arrival time">+</button><b>New time</b></div>${newOpen?`<div style="display:flex;gap:8px;align-items:center"><input id="newtime" type="time" aria-label="Arrival time" value="${esc(newTime||sugg())}" style="flex:1;min-height:44px"><button type="button" class="btn" id="newadd" style="width:auto;padding:0 16px;min-height:44px">Add</button><button type="button" class="btn alt" id="newno" style="width:auto;padding:0 14px;min-height:44px">Cancel</button></div>`:'<div class="muted">Pick another time you plan to arrive.</div>'}</div>`;
+      return `<div class="card" style="flex-direction:row;justify-content:space-between;align-items:center;gap:10px"><div><div class="avs" role="img" aria-label="${esc(g.who.join(', ')||'Open doubles group')}">${chips}</div><div class="muted" style="margin-top:4px">${sub}${g.mine?' · <button type="button" class="lnk" data-leave="1">Remove me</button>':''}</div></div>${full?'<span class="muted" style="font-weight:600">Full</span>':''}</div>`}).join('')+`<div class="card" style="gap:8px"><div style="display:flex;align-items:center;gap:10px"><button type="button" class="av empty add" id="newt" aria-label="Add a new arrival time">+</button><b>New time</b></div>${newOpen?`<div style="display:flex;gap:8px;align-items:center"><input id="newtime" type="time" aria-label="Arrival time" value="${esc(newTime||sugg())}" style="flex:1;min-height:44px"><button type="button" class="btn" id="newadd" style="width:auto;padding:0 16px;min-height:44px">Add</button><button type="button" class="btn alt" id="newno" style="width:auto;padding:0 14px;min-height:44px">Cancel</button></div>`:'<div class="muted">Pick another time you plan to arrive.</div>'}</div>`;
     if(arrs.length&&!user&&gName()&&gEmail()&&joinAsk===null)h+=`<div class="muted">Joining as <b>${esc(gName())}</b> (guest) · <button type="button" class="lnk" id="gchange">Change details</button></div>`;
     h+=`<b class="sg">Today's updates</b>`;
     h+=reps.length?`<div class="card" style="padding:2px 12px;gap:0">${reps.map((r,k)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 0;font-size:13.5px;${k?'border-top:1px solid var(--ring)':''}"><span><b>${esc(r.who)}</b> <span class="muted" style="font-size:12px">· ${ago(r.created_at)}</span></span><span>${r.level!=null?`<b style="color:${LV[r.level].c}">${LV[r.level].n}</b>`:`<span class="muted">${r.playing} playing · ${r.waiting} waiting</span>`}</span></div>`).join('')}</div>`:'<div class="muted">No updates yet today.</div>';
@@ -176,6 +176,7 @@ function renderPark(){
      newOpen=false;newTime='';go({t:'join',at:d.toISOString()})}}
   app.querySelectorAll('[data-join]').forEach(b=>b.onclick=()=>{const g=grp()[Number(b.dataset.join)];if(!g)return;go({t:'join',at:g.at})});
   app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>go({t:'lv',lv:Number(b.dataset.lv)}));
+  app.querySelectorAll('[data-leave]').forEach(b=>b.onclick=doLeave);{const u=document.getElementById('undo');if(u)u.onclick=doLeave}
   {const gj=document.getElementById('gjoin'),gc=document.getElementById('gcancel');
    {const ch=document.getElementById('gchange');if(ch)ch.onclick=()=>{try{localStorage.removeItem('cn-guest');localStorage.removeItem('cn-guest-email')}catch(e){}joinDraft={n:'',e:''};render()}}
    if(gc)gc.onclick=()=>{joinAsk=null;joinDraft={n:'',e:''};render()};
@@ -184,6 +185,9 @@ function renderPark(){
      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){joinMsg='Please enter a valid email.';return render()}
      try{localStorage.setItem('cn-guest',n);localStorage.setItem('cn-guest-email',em)}catch(e){}doAct(g,n,em)}}
 }
+async function doLeave(){joinUndo=false;joinMsg='';
+  const {error}=await sb.from('arrivals').delete().eq('park_slug',slug).eq('sport',prefs.sport);
+  joinMsg=error?'Could not remove: '+error.message:'Removed. You are no longer listed as coming.';render();if(!error)load()}
 async function doAct(p,guestName,guestEmail){
   let name,sess=(await sb.auth.getSession()).data.session;
   if(user){const m=user.user_metadata||{};name=[m.first_name,m.last_name].filter(Boolean).join(' ')||(user.email||'').split('@')[0]}
@@ -194,7 +198,7 @@ async function doAct(p,guestName,guestEmail){
   if(p.t==='join'){({error}=await sb.from('arrivals').insert({park_slug:slug,sport:prefs.sport,reporter_name:name,arriving_at:p.at}));
     ok="You're joining at "+new Date(p.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'. See you there!'}
   else{({error}=await sb.from('reports').insert({park_slug:slug,sport:prefs.sport,reporter_name:name,level:p.lv}));ok='Thanks! You reported '+LV[p.lv].n+'.'}
-  joinAsk=null;joinMsg=error?'Could not '+(p.t==='join'?'join':'report')+': '+error.message:ok;render();if(!error)load()}
+  joinAsk=null;joinUndo=!error&&p.t==='join';joinMsg=error?'Could not '+(p.t==='join'?'join':'report')+': '+error.message:ok;render();if(!error)load()}
 function render(){
   if(slug)return renderPark();
   let {list,all,located}=view();
