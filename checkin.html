@@ -97,6 +97,7 @@ function liveCard(){const l=S.live;if(!l)return '';const n=Number(l.report_count
 function sportSeg(){const p=S.park;return `<div class="seg" role="group" aria-label="Sport">${p.pickleball_courts>0?`<button aria-pressed="${prefs.sport==='pickleball'}" data-sport="pickleball">${PB}Pickleball</button>`:''}${p.tennis_courts>0?`<button aria-pressed="${prefs.sport==='tennis'}" data-sport="tennis">${TN}Tennis</button>`:''}</div>`}
 function render(){
  let h=head();
+ if(S.park&&S.step!=='loading'&&S.step!=='nopark')h+=`<a href="./?park=${encodeURIComponent(S.park.slug)}" style="display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--ink);font-weight:600;text-decoration:none" id="backpark">← Back to ${esc(S.park.name)}</a>`;
  if(S.step==='loading')h+='<div class="muted">Loading…</div>';
  else if(S.step==='nopark')h+='<div class="card"><b>Park not found</b><div class="muted">Check the QR code on the sign, or the link you were given.</div></div>';
  else if(S.step==='signin')h+=`${liveCard()}<h1>Sign in</h1><div class="muted">Optional. ${esc(S.park.name)}. Signing in shows your full name and works on any device.</div>
