@@ -154,7 +154,7 @@ function renderPark(){
     if(arrs.length)h+=`<b class="sg">Coming soon</b>`+grp().map((g,i)=>{const t=new Date(g.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),full=g.dbl&&g.who.length===4;
       const shown=g.dbl?g.who:g.who.slice(0,5),extra=g.dbl?0:g.who.length-shown.length;
       const add=`<button type="button" class="av empty add" data-join="${i}" aria-label="Join at ${t}" title="Join at ${t}">+</button>`;
-      const chips=shown.map(w=>avatar(w)).join('')+(extra>0?`<span class="av more">+${extra}</span>`:'')+(g.dbl?(full?'':add+Array.from({length:3-g.who.length},()=>'<span class="av empty" aria-hidden="true"></span>').join('')):add);
+      const chips=shown.map(w=>avatar(w)).join('')+(extra>0?`<span class="av more">+${extra}</span>`:'')+(g.dbl?(full?'':Array.from({length:4-g.who.length},()=>add).join('')):add);
       const sub=g.dbl?`Doubles ${g.who.length}/4 · ${full?'Full · ':''}arriving ${t}`:`${g.who.length>1?g.who.length+' people · ':''}arriving ${t}`;
       return `<div class="card" style="flex-direction:row;justify-content:space-between;align-items:center;gap:10px"><div><div class="avs" role="img" aria-label="${esc(g.who.join(', ')||'Open doubles group')}">${chips}</div><div class="muted" style="margin-top:4px">${sub}</div></div>${full?'<span class="muted" style="font-weight:600">Full</span>':''}</div>`}).join('');
     if(arrs.length&&!user&&gName()&&gEmail()&&joinAsk===null)h+=`<div class="muted">Joining as <b>${esc(gName())}</b> (guest) · <button type="button" class="lnk" id="gchange">Change details</button></div>`;
